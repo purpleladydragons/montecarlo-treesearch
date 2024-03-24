@@ -1,7 +1,9 @@
+import pickle
 import random
 from typing import Dict
 import math
 from .games.tictactoe import TicTacToe
+from .games.mega_tictactoe import MegaTicTacToe
 
 class MCTSNode:
     def __init__(self, game):
@@ -31,6 +33,20 @@ class MCTS:
 
     def __init__(self, game):
         self.root = MCTSNode(game)
+
+    def save_tree(filename: str):
+        print('saving tree')
+        with open(filename, 'wb') as f:
+            pickle.dump(MCTS.memoized_states, f)
+
+    def load_tree(filename: str):
+        try:
+            with open(filename, 'rb') as f:
+                print('loading tree')
+                MCTS.memoized_states = pickle.load(f)
+                print(f"Loaded tree from {filename} with {len(MCTS.memoized_states)} states")
+        except FileNotFoundError:
+            print(f"No tree found at {filename}, starting a new tree.")
 
     def load_node(game):
         if game.get_hash() not in MCTS.memoized_states:
@@ -87,20 +103,23 @@ class MCTS:
             MCTS.selfplay(original_state)
 
 
-MCTS.learn(TicTacToe(), games=5000)
+MCTS.load_tree('megattt.pkl')
+MCTS.learn(MegaTicTacToe(), games=1000)
+MCTS.save_tree('megattt.pkl')
 
 # play against trained AI
-game = TicTacToe()
+game = MegaTicTacToe()
 game.prettyprint()
 
 player = 0
 
 while not game.is_game_over():
     if player == 0:
-        move = input('Enter r,c move like 00: ')
-        r = int(move[0])
-        c = int(move[1])
-        game = game.apply_action({'row': r, 'col': c})
+        move = input('Enter b,r,c move like 200: ')
+        board = int(move[0])
+        r = int(move[1])
+        c = int(move[2])
+        game = game.apply_action({'row': r, 'col': c, 'board': board})
     if player == 1:
         node = MCTS.load_node(game)
         game = MCTS.pick_next_node(node, is_learning=False).game

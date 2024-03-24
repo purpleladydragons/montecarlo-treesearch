@@ -1,7 +1,8 @@
 from enum import Enum, auto
 import copy
+from .game import Game
 
-class TicTacToe:
+class TicTacToe(Game):
     class Action(Enum):
         def __init__(self, row=None, col=None):
             self.row = row
