@@ -9,10 +9,18 @@ from .games.tictactoe import TicTacToe
 from .games.mega_tictactoe import MegaTicTacToe
 
 class MCTSNode:
-    def __init__(self, game):
-        self.game = game
+    def __init__(self, game_hash, load_from_hash):
+        self.game_hash = game_hash  # Store the hash instead of the game instance
+        self.game = None  # Lazy-loaded game instance
+        self.load_from_hash = load_from_hash # method to load the game
         self.num_plays = 0
-        self.cumulative_score = { 0: 0, 1: 0}
+        self.cumulative_score = {0: 0, 1: 0}
+
+    def get_game(self):
+        # Lazy load the game instance if it's not already loaded
+        if self.game is None:
+            self.game = self.load_from_hash(self.game_hash)
+        return self.game
 
     def to_json(self):
         return {
@@ -41,7 +49,7 @@ class MCTS:
     memoized_states = {}
 
     def __init__(self, game):
-        self.root = MCTSNode(game)
+        self.root = MCTSNode(game.get_hash())
 
     def save_tree_json(filename: str):
         print('saving tree to json')
@@ -56,8 +64,7 @@ class MCTS:
                 print('loading tree from json')
                 json_data = json.load(f)
                 for game_hash, node_data in json_data.items():
-                    game = load_from_hash(game_hash)
-                    game_node = MCTSNode(game)
+                    game_node = MCTSNode(game_hash, load_from_hash)  # Initialize with hash
                     game_node.num_plays = node_data['num_plays']
                     game_node.cumulative_score = {int(k): v for k, v in node_data['cumulative_score'].items()}
                     MCTS.memoized_states[game_hash] = game_node
@@ -66,39 +73,26 @@ class MCTS:
             print(f"No tree found at {filename}, starting a new tree.")
 
 
-    def save_tree(filename: str):
-        print('saving tree')
-        with open(filename, 'wb') as f:
-            pickle.dump(MCTS.memoized_states, f)
-
-    def load_tree(filename: str):
-        try:
-            with open(filename, 'rb') as f:
-                print('loading tree')
-                MCTS.memoized_states = pickle.load(f)
-                print(f"Loaded tree from {filename} with {len(MCTS.memoized_states)} states")
-        except FileNotFoundError:
-            print(f"No tree found at {filename}, starting a new tree.")
-
-    def load_node(game):
-        if game.get_hash() not in MCTS.memoized_states:
-            game_node = MCTSNode(game)
-            MCTS.memoized_states[game.get_hash()] = game_node
-        found_node = MCTS.memoized_states[game.get_hash()]
+    def load_node(game, load_from_hash):
+        game_hash = game.get_hash(for_loading=True)
+        if game_hash not in MCTS.memoized_states:
+            game_node = MCTSNode(game_hash, load_from_hash)
+            MCTS.memoized_states[game_hash] = game_node
+        found_node = MCTS.memoized_states[game_hash]
+        found_node.load_from_hash = load_from_hash
         # we set the game because there are possibly relevant state facts that aren't important to save in hash
         # e.g previous move can affect where you're allowed to play now, but isn't actually relevant when deciding best next move
         # to be more clear, we set the game bc the loaded game is loaded from hash which would destroy such info
         # but the provided game arg is the same hash-wise with that extra info
-        found_node.game = game
         return found_node
 
 
     def pick_next_node(state, is_learning=True):
-        actions = state.game.get_available_actions()
+        actions = state.get_game().get_available_actions()
         next_nodes = []
         for action in actions:
-            next_game = state.game.apply_action(action)
-            next_node = MCTS.load_node(next_game)
+            next_game = state.get_game().apply_action(action)
+            next_node = MCTS.load_node(next_game, state.load_from_hash)
             next_nodes.append((next_node, action))
         
         # we calculate the number of plays across all siblings, instead of using the parent
@@ -107,7 +101,7 @@ class MCTS:
         total_sibling_plays = sum(node.num_plays for node, _ in next_nodes)
         ucb_scores_and_nodes = []
         # we get player of _current_ state and aim to find children nodes that are favorable to current player
-        player = state.game.get_player()
+        player = state.get_game().get_player()
         for node, action in next_nodes:
             ucb = node.ucb1(total_sibling_plays, player, is_learning)
             ucb_scores_and_nodes.append((ucb, node, action))
@@ -135,7 +129,7 @@ class MCTS:
             state.record_scores(scores)
 
     def learn(original_game, games=100):
-        original_state = MCTSNode(original_game)
+        original_state = MCTSNode(original_game.get_hash())
         for i in range(games):
             print('game', i)
             MCTS.selfplay(original_state)
@@ -172,8 +166,8 @@ while not game.is_game_over():
             action = {'row': r, 'col': c, 'board': board}
         game = game.apply_action(action)
     if player == 1:
-        node = MCTS.load_node(game)
-        game = MCTS.pick_next_node(node, is_learning=False).game
+        node = MCTS.load_node(game, MegaTicTacToe.load_from_hash)
+        game = MCTS.pick_next_node(node, is_learning=False).get_game()
 
     game.prettyprint()
     player = 1 if player == 0 else 0

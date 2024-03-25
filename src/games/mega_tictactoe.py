@@ -11,14 +11,16 @@ class MegaTicTacToe(Game):
     def get_player(self):
         return 0 if self.player == 'X' else 1
 
-    def get_hash(self):
+    def get_hash(self, for_loading=False):
         boards_str = '|'.join([''.join([''.join(row) for row in board]) for board in self.boards])
+        if for_loading:
+            return f"{''.join(self.prev_move)}|{self.player}|{boards_str}"
         return f"{self.player}|{boards_str}"
 
     @classmethod
     def load_from_hash(cls, hash_str):
         parts = hash_str.split('|')
-        player, boards_list = parts[0], parts[1:]
+        prev_move, player, boards_list = parts[0], parts[1], parts[2:]
 
         boards = []
         for board_str in boards_list:
@@ -28,6 +30,7 @@ class MegaTicTacToe(Game):
         instance = cls()
         instance.player = player
         instance.boards = boards
+        instance.prev_move = (int(prev_move[0], int(prev_move[1]), int(prev_move[2])))
         # Recalculate global board state based on loaded boards
         for board_index, board in enumerate(instance.boards):
             winner = instance._check_winner_mini_board(board)
