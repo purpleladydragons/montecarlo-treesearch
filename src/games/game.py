@@ -5,6 +5,11 @@ class Game(ABC):
     def get_hash(self):
         pass
 
+    @classmethod
+    @abstractmethod
+    def load_from_hash(cls, hash_str):
+        pass
+
     @abstractmethod
     def get_player(self):
         pass
