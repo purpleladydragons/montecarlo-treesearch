@@ -74,7 +74,7 @@ class MCTS:
 
 
     def load_node(game, load_from_hash):
-        game_hash = game.get_hash(for_loading=True)
+        game_hash = game.get_hash()
         if game_hash not in MCTS.memoized_states:
             game_node = MCTSNode(game_hash, load_from_hash)
             MCTS.memoized_states[game_hash] = game_node
@@ -120,7 +120,7 @@ class MCTS:
 
     def selfplay(state):
         played_states = [state]
-        while not state.game.is_game_over():
+        while not state.get_game().is_game_over():
             state = MCTS.pick_next_node(state)
             played_states.append(state)
 
@@ -128,8 +128,9 @@ class MCTS:
         for state in played_states:
             state.record_scores(scores)
 
-    def learn(original_game, games=100):
-        original_state = MCTSNode(original_game.get_hash())
+    def learn(cls, games=100):
+        original_game = cls()
+        original_state = MCTSNode(original_game.get_hash(), cls.load_from_hash)
         for i in range(games):
             print('game', i)
             MCTS.selfplay(original_state)
@@ -139,14 +140,14 @@ def signal_handler(sig, frame):
     MCTS.save_tree_json('megattt.json')
     sys.exit(0)
 
-# signal.signal(signal.SIGINT, signal_handler)
-
+signal.signal(signal.SIGINT, signal_handler)
 
 MCTS.load_tree_json('megattt.json', MegaTicTacToe.load_from_hash)
-# MCTS.learn(MegaTicTacToe(), games=5000)
-# MCTS.save_tree_json('megattt.json')
+MCTS.learn(MegaTicTacToe, games=10000)
+MCTS.save_tree_json('megattt.json')
 
-print('tree loaded')
+# disable handler after tree has been saved
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # play against trained AI
 game = MegaTicTacToe()

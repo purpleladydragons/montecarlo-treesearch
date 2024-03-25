@@ -11,16 +11,15 @@ class MegaTicTacToe(Game):
     def get_player(self):
         return 0 if self.player == 'X' else 1
 
-    def get_hash(self, for_loading=False):
+    def get_hash(self):
         boards_str = '|'.join([''.join([''.join(row) for row in board]) for board in self.boards])
-        if for_loading:
-            return f"{''.join(self.prev_move)}|{self.player}|{boards_str}"
-        return f"{self.player}|{boards_str}"
+        prev_move_str = 'None' if self.prev_move is None else f"{self.prev_move[0]},{self.prev_move[1]}"
+        return f"{prev_move_str}|{self.player}|{boards_str}"
 
     @classmethod
     def load_from_hash(cls, hash_str):
         parts = hash_str.split('|')
-        prev_move, player, boards_list = parts[0], parts[1], parts[2:]
+        prev_move_str, player, boards_list = parts[0], parts[1], parts[2:]
 
         boards = []
         for board_str in boards_list:
@@ -30,7 +29,10 @@ class MegaTicTacToe(Game):
         instance = cls()
         instance.player = player
         instance.boards = boards
-        instance.prev_move = (int(prev_move[0], int(prev_move[1]), int(prev_move[2])))
+        if prev_move_str == 'None':
+            instance.prev_move = None
+        else:
+            instance.prev_move = tuple(map(int, prev_move_str.split(',')))
         # Recalculate global board state based on loaded boards
         for board_index, board in enumerate(instance.boards):
             winner = instance._check_winner_mini_board(board)
@@ -46,8 +48,7 @@ class MegaTicTacToe(Game):
         actions = []
         # if prev move was mid row, left col of a board, then the next move _has_ to be in the mid row, left col mini board
         # if first move, or if mini board is unvailable, play anywhere
-
-        if self.prev_move is None or self.global_board[self.prev_move[1]][self.prev_move[2]] != '.':
+        if self.prev_move is None or self.global_board[self.prev_move[0]][self.prev_move[1]] != '.':
             for board_index, board in enumerate(self.boards):
                 global_row, global_col = divmod(board_index, 3)
                 if self.global_board[global_row][global_col] != '.':
@@ -60,7 +61,7 @@ class MegaTicTacToe(Game):
                         if cell == '.':
                             actions.append({'row': row_index, 'col': col_index, 'board': board_index})
         else:
-            _, r, c = self.prev_move
+            r, c = self.prev_move
             playable_board_idx = r*3 + c
             playable_board = self.boards[playable_board_idx]
             for row in range(len(playable_board)):
@@ -89,7 +90,7 @@ class MegaTicTacToe(Game):
 
         # Switch player
         new_game.player = 'X' if new_game.player == 'O' else 'O'
-        new_game.prev_move = (board_index, row, col)
+        new_game.prev_move = (row, col)
         return new_game
 
     def _check_winner_mini_board(self, board):
